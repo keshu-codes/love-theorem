@@ -1,5 +1,5 @@
 // Love Theorem Frontend JavaScript - COMPLETE FIXED VERSION
-const API_BASE = "/api"; // This will work for both local and production
+const API_BASE = "https://love-theorem-backend.onrender.com/api";
 
 // Enhanced PPT-style transitions
 const transitionTypes = ["morph", "split", "push", "reveal", "zoom", "sweep"];
