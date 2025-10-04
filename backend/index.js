@@ -1,47 +1,65 @@
-// Love Theorem Backend (Express + Multer) - WITH PERSISTENT STORAGE
+// Love Theorem Backend (Express + Multer) - WITH USER PRIVACY
 // Upload WhatsApp .txt export and compute Love Theorem score
 
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
-const fs = require("fs"); // ADDED for file storage
-const path = require("path"); // ADDED for file paths
+const fs = require("fs");
+const path = require("path");
 
 const upload = multer(); // memory storage
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ========== PERSISTENT STORAGE SETUP ==========
-const DATA_FILE = path.join(__dirname, "chatAnalyses.json");
+// ========== ENHANCED USER-BASED STORAGE ==========
+const DATA_FILE = path.join(__dirname, 'userAnalyses.json');
 
-// Function to load analyses from file
-function loadAnalyses() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const data = fs.readFileSync(DATA_FILE, "utf8");
-      console.log("✅ Loaded analyses from file");
-      return JSON.parse(data);
-    }
-  } catch (e) {
-    console.error("❌ Error loading analyses from file:", e);
-  }
-  console.log("📁 No existing data file, starting fresh");
-  return {};
-}
+// Enhanced storage with user separation
+let userAnalyses = {};
 
-// Function to save analyses to file
-function saveAnalyses(analyses) {
+// Load existing data
+if (fs.existsSync(DATA_FILE)) {
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(analyses, null, 2));
-    console.log("💾 Saved analyses to file");
+    userAnalyses = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    console.log('✅ Loaded user analyses from file');
   } catch (e) {
-    console.error("❌ Error saving analyses to file:", e);
+    console.error('❌ Error loading user analyses:', e);
+    userAnalyses = {};
   }
 }
 
-// Persistent storage instead of in-memory only
-let chatAnalyses = loadAnalyses();
+// Generate unique user ID
+function generateUserId() {
+  return 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Save to file
+function saveUserAnalyses() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(userAnalyses, null, 2));
+    console.log('💾 Saved user analyses to file');
+  } catch (e) {
+    console.error('❌ Error saving user analyses:', e);
+  }
+}
+
+// ========== HEALTH CHECK ROUTES ==========
+app.get("/", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    message: "Love Theorem Backend is running!",
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "healthy", 
+    service: "Love Theorem API",
+    timestamp: new Date().toISOString()
+  });
+});
 
 // ========== API ROUTE ==========
 app.post("/api/analyze", upload.single("file"), (req, res) => {
@@ -84,28 +102,43 @@ app.post("/api/analyze", upload.single("file"), (req, res) => {
 // Get all saved analyses for a user
 app.get("/api/analyses", (req, res) => {
   try {
-    res.json({ success: true, analyses: chatAnalyses });
+    const userId = req.query.userId;
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    const analyses = userAnalyses[userId] || {};
+    res.json({ success: true, analyses, userId });
   } catch (err) {
     console.error("Error fetching analyses:", err);
     res.status(500).json({ error: "Failed to fetch analyses" });
   }
 });
 
-// Save analysis to history - UPDATED WITH PERSISTENT STORAGE
+// Save analysis to history
 app.post("/api/analyses/save", (req, res) => {
   try {
-    const { analysisData, chatName, timestamp } = req.body;
+    const { analysisData, chatName, timestamp, userId } = req.body;
 
     if (!analysisData) {
       return res.status(400).json({ error: "Analysis data is required" });
     }
 
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
     const analysisId = `analysis_${Date.now()}`;
 
-    // Save new analysis
-    chatAnalyses[analysisId] = {
+    // Initialize user storage if not exists
+    if (!userAnalyses[userId]) {
+      userAnalyses[userId] = {};
+    }
+
+    // Save analysis for specific user
+    userAnalyses[userId][analysisId] = {
       id: analysisId,
-      chatName: chatName || `Chat ${new Date().toLocaleDateString()}`,
+      chatName: chatName || `Chat with ${analysisData.participants.join(" & ")}`,
       timestamp: timestamp || new Date().toISOString(),
       data: analysisData,
       participants: analysisData.participants,
@@ -113,12 +146,12 @@ app.post("/api/analyses/save", (req, res) => {
       totalMessages: analysisData.counts.totalMessages,
     };
 
-    // 🆕 SAVE TO FILE FOR PERSISTENCE
-    saveAnalyses(chatAnalyses);
+    saveUserAnalyses();
 
     res.json({
       success: true,
       analysisId,
+      userId,
       message: "Analysis saved successfully",
     });
   } catch (err) {
@@ -131,7 +164,13 @@ app.post("/api/analyses/save", (req, res) => {
 app.get("/api/analyses/:id", (req, res) => {
   try {
     const { id } = req.params;
-    const analysis = chatAnalyses[id];
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const analysis = userAnalyses[userId] ? userAnalyses[userId][id] : null;
 
     if (!analysis) {
       return res.status(404).json({ error: "Analysis not found" });
@@ -144,24 +183,48 @@ app.get("/api/analyses/:id", (req, res) => {
   }
 });
 
-// Delete analysis - UPDATED WITH PERSISTENT STORAGE
+// Delete analysis
 app.delete("/api/analyses/:id", (req, res) => {
   try {
     const { id } = req.params;
+    const { userId } = req.query;
 
-    if (!chatAnalyses[id]) {
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    if (!userAnalyses[userId] || !userAnalyses[userId][id]) {
       return res.status(404).json({ error: "Analysis not found" });
     }
 
-    delete chatAnalyses[id];
-
-    // 🆕 SAVE TO FILE AFTER DELETION
-    saveAnalyses(chatAnalyses);
+    delete userAnalyses[userId][id];
+    saveUserAnalyses();
 
     res.json({ success: true, message: "Analysis deleted successfully" });
   } catch (err) {
     console.error("Error deleting analysis:", err);
     res.status(500).json({ error: "Failed to delete analysis" });
+  }
+});
+
+// Clear all data for a user
+app.delete("/api/clear-my-data", (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    if (userAnalyses[userId]) {
+      delete userAnalyses[userId];
+      saveUserAnalyses();
+    }
+
+    res.json({ success: true, message: "All your data has been cleared" });
+  } catch (err) {
+    console.error("Error clearing user data:", err);
+    res.status(500).json({ error: "Failed to clear data" });
   }
 });
 
@@ -440,108 +503,19 @@ function analyzeChat(text) {
 
   // ========== ENHANCED EMOTIONAL KEYWORDS ANALYSIS ==========
   const positiveWords = [
-    "love",
-    "miss",
-    "care",
-    "beautiful",
-    "handsome",
-    "amazing",
-    "wonderful",
-    "perfect",
-    "happy",
-    "excited",
-    "good",
-    "great",
-    "nice",
-    "sweet",
-    "cute",
-    "awesome",
-    "fantastic",
-    "brilliant",
-    "lovely",
-    "adore",
-    "cherish",
-    "treasure",
-    "special",
-    "wonderful",
-    "magnificent",
-    "gorgeous",
-    "stunning",
-    "perfect",
-    "bliss",
-    "ecstatic",
-    "joy",
-    "delight",
-    "pleasure",
-    "content",
-    "glad",
-    "proud",
-    "thankful",
-    "grateful",
-    "blessed",
-    "lucky",
-    "fortunate",
-    "smile",
-    "laugh",
-    "hug",
-    "kiss",
-    "romantic",
-    "passionate",
-    "intimate",
-    "affectionate",
+    "love", "miss", "care", "beautiful", "handsome", "amazing", "wonderful", "perfect", "happy", "excited",
+    "good", "great", "nice", "sweet", "cute", "awesome", "fantastic", "brilliant", "lovely", "adore",
+    "cherish", "treasure", "special", "wonderful", "magnificent", "gorgeous", "stunning", "perfect", "bliss", "ecstatic",
+    "joy", "delight", "pleasure", "content", "glad", "proud", "thankful", "grateful", "blessed", "lucky",
+    "fortunate", "smile", "laugh", "hug", "kiss", "romantic", "passionate", "intimate", "affectionate",
   ];
 
   const negativeWords = [
-    "sorry",
-    "sad",
-    "angry",
-    "hate",
-    "fight",
-    "mad",
-    "upset",
-    "wrong",
-    "bad",
-    "stupid",
-    "hurt",
-    "annoying",
-    "terrible",
-    "awful",
-    "horrible",
-    "disappointed",
-    "frustrated",
-    "annoyed",
-    "irritated",
-    "angry",
-    "furious",
-    "hate",
-    "despise",
-    "loathe",
-    "regret",
-    "guilty",
-    "ashamed",
-    "miserable",
-    "depressed",
-    "heartbroken",
-    "crushed",
-    "devastated",
-    "disgusted",
-    "worried",
-    "anxious",
-    "scared",
-    "afraid",
-    "fear",
-    "pain",
-    "suffer",
-    "cry",
-    "tears",
-    "breakup",
-    "leave",
-    "abandon",
-    "betray",
-    "cheat",
-    "lie",
-    "argument",
-    "fight",
+    "sorry", "sad", "angry", "hate", "fight", "mad", "upset", "wrong", "bad", "stupid",
+    "hurt", "annoying", "terrible", "awful", "horrible", "disappointed", "frustrated", "annoyed", "irritated", "angry",
+    "furious", "hate", "despise", "loathe", "regret", "guilty", "ashamed", "miserable", "depressed", "heartbroken",
+    "crushed", "devastated", "disgusted", "worried", "anxious", "scared", "afraid", "fear", "pain", "suffer",
+    "cry", "tears", "breakup", "leave", "abandon", "betray", "cheat", "lie", "argument", "fight",
   ];
 
   let positiveCount = 0;
@@ -1055,23 +1029,6 @@ function parseWhatsAppDate(dateStr, timeStr) {
     return null;
   }
 }
-// ========== HEALTH CHECK ROUTES ==========
-app.get("/", (req, res) => {
-  res.json({ 
-    status: "OK", 
-    message: "Love Theorem Backend is running!",
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get("/api/health", (req, res) => {
-  res.json({ 
-    status: "healthy", 
-    service: "Love Theorem API",
-    timestamp: new Date().toISOString()
-  });
-});
-
 
 // ========== SERVER ==========
 const PORT = process.env.PORT || 10000;
