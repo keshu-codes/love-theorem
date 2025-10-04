@@ -1,6 +1,13 @@
 // Love Theorem Frontend JavaScript - COMPLETE FIXED VERSION
 const API_BASE = "https://love-theorem-backend.onrender.com/api";
 
+// User ID management for privacy
+let USER_ID = localStorage.getItem('loveTheoremUserId');
+if (!USER_ID) {
+  USER_ID = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('loveTheoremUserId', USER_ID);
+}
+
 // Enhanced PPT-style transitions
 const transitionTypes = ["morph", "split", "push", "reveal", "zoom", "sweep"];
 let currentTransition = 0;
