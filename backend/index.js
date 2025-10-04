@@ -1055,9 +1055,33 @@ function parseWhatsAppDate(dateStr, timeStr) {
     return null;
   }
 }
+// ========== HEALTH CHECK ROUTES ==========
+app.get("/", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    message: "Love Theorem Backend is running!",
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "healthy", 
+    service: "Love Theorem API",
+    timestamp: new Date().toISOString()
+  });
+});
+
 
 // ========== SERVER ==========
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`🚀 Love Theorem backend running on http://localhost:${PORT}`)
-);
+const PORT = process.env.PORT || 10000;
+
+// Improved server start with error handling
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Love Theorem backend running on port ${PORT}`);
+  console.log(`✅ Health check: http://0.0.0.0:${PORT}/`);
+  console.log(`✅ API available at: http://0.0.0.0:${PORT}/api`);
+}).on('error', (err) => {
+  console.error('❌ Server failed to start:', err);
+  process.exit(1);
+});
