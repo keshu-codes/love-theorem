@@ -490,20 +490,48 @@ function setupFileUpload() {
       }, 5000);
     } catch (error) {
       console.error("Error analyzing chat:", error);
+      console.error("Full error object:", JSON.stringify(error, null, 2));
+
+      let errorData;
 
       try {
-        // Try to parse the error as JSON (from our enhanced error handling)
-        const errorData = JSON.parse(error.message);
-        showError(errorData);
+        // Check if error.message is a JSON string
+        if (error.message && error.message.startsWith("{")) {
+          errorData = JSON.parse(error.message);
+        }
+        // Check if error is already an object with the structure we expect
+        else if (error.userFriendly || error.message) {
+          errorData = error;
+        }
+        // Handle case where we get [object Object]
+        else if (error.message === "[object Object]") {
+          errorData = {
+            title: "Upload Failed",
+            message: "There was an issue processing your ZIP file.",
+            details: "The file might be corrupted or in an unexpected format.",
+            errorType: "ZIP_PROCESSING_ERROR",
+          };
+        }
+        // Fallback for string errors
+        else {
+          errorData = {
+            title: "Upload Failed",
+            message: error.message || "An unknown error occurred",
+            details: "Please check your file and try again.",
+            errorType: "UNKNOWN_ERROR",
+          };
+        }
       } catch (e) {
-        // Fallback for non-JSON errors
-        showError({
+        // Ultimate fallback
+        errorData = {
           title: "Upload Failed",
-          message: error.message,
-          details: "Please check your file and try again.",
-          errorType: "UNKNOWN_ERROR",
-        });
+          message: "An unexpected error occurred while processing your file.",
+          details: "Please try again with a different file or contact support.",
+          errorType: "UNEXPECTED_ERROR",
+        };
       }
+
+      showError(errorData);
 
       // Reset progress bar on error
       if (progressBar && progressFill) {
@@ -518,10 +546,25 @@ function setupFileUpload() {
     const analysisResult = document.getElementById("analysisResult");
     if (!analysisResult) return;
 
-    const { title, message, details, errorType, warnings = [] } = errorData;
+    // Ensure errorData has the expected structure
+    const {
+      title = "Upload Failed",
+      message = "An unknown error occurred",
+      details = "Please try again.",
+      errorType = "UNKNOWN_ERROR",
+      warnings = [],
+    } = errorData;
+
+    console.log("Displaying error:", {
+      title,
+      message,
+      details,
+      errorType,
+      warnings,
+    });
 
     let warningSection = "";
-    if (warnings.length > 0) {
+    if (warnings && warnings.length > 0) {
       warningSection = `
       <div class="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-4">
         <h4 class="font-bold text-yellow-300 mb-2">⚠️ Notes:</h4>
@@ -534,42 +577,17 @@ function setupFileUpload() {
 
     // Specific help based on error type
     let specificHelp = "";
-    switch (errorType) {
-      case "FILE_TYPE_ERROR":
-        specificHelp = `
-        <div class="bg-blue-500/20 p-3 rounded-lg mb-4">
-          <p class="text-sm text-blue-200">
-            <strong>💡 Supported Files:</strong><br>
-            • <strong>.txt</strong> - Direct WhatsApp chat export<br>
-            • <strong>.zip</strong> - WhatsApp export with media (we'll extract the .txt automatically)
-          </p>
-        </div>
-      `;
-        break;
-      case "INVALID_CHAT_FORMAT":
-      case "NO_VALID_MESSAGES":
-        specificHelp = `
-        <div class="bg-orange-500/20 p-3 rounded-lg mb-4">
-          <p class="text-sm text-orange-200">
-            <strong>🔧 Format Help:</strong><br>
-            Make sure you're exporting from WhatsApp using:<br>
-            <strong>Contact/Group Info → Export Chat → WITHOUT MEDIA</strong>
-          </p>
-        </div>
-      `;
-        break;
-      case "FILE_TOO_LARGE":
-        specificHelp = `
-        <div class="bg-purple-500/20 p-3 rounded-lg mb-4">
-          <p class="text-sm text-purple-200">
-            <strong>📏 Size Solutions:</strong><br>
-            • Export <strong>WITHOUT MEDIA</strong> to reduce file size<br>
-            • Split long conversations by date range<br>
-            • Maximum: 50MB for .txt, 100MB for .zip
-          </p>
-        </div>
-      `;
-        break;
+    if (errorType.includes("ZIP") || errorType.includes("FILE")) {
+      specificHelp = `
+      <div class="bg-blue-500/20 p-3 rounded-lg mb-4">
+        <p class="text-sm text-blue-200">
+          <strong>💡 ZIP File Help:</strong><br>
+          • Make sure your ZIP file contains a .txt file from WhatsApp<br>
+          • Try exporting from WhatsApp as "WITHOUT MEDIA" first<br>
+          • Ensure the file is not corrupted or password protected
+        </p>
+      </div>
+    `;
     }
 
     analysisResult.classList.remove("hidden");
@@ -605,16 +623,6 @@ function setupFileUpload() {
             <span>Save and upload the .txt or .zip file here</span>
           </li>
         </ol>
-        
-        <div class="mt-4 p-3 bg-black/20 rounded-lg">
-          <p class="text-xs text-center text-gray-300">
-            <strong>File Requirements:</strong><br>
-            • Must be a valid WhatsApp export<br>
-            • Must contain conversation between 2+ people<br>
-            • Must have proper timestamps<br>
-            • Max 50MB for .txt, 100MB for .zip
-          </p>
-        </div>
       </div>
 
       <div class="text-center space-y-2">
