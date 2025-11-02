@@ -4,17 +4,21 @@
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
-app.use(cors({
-  origin: "https://love-theorem-frontend.onrender.com"
-}));
 const fs = require("fs");
 const path = require("path");
-const AdmZip = require('adm-zip');
+const AdmZip = require("adm-zip");
 
-const upload = multer(); // memory storage
 const app = express();
-app.use(cors());
+const upload = multer(); // memory storage
+
+// ✅ Enable CORS for your frontend
+app.use(cors({
+  origin: "https://love-theorem-frontend.onrender.com",
+}));
+
+// ✅ Enable JSON parsing
 app.use(express.json());
+
 
 // ========== ENHANCED USER-BASED STORAGE ==========
 const DATA_FILE = path.join(__dirname, 'userAnalyses.json');
