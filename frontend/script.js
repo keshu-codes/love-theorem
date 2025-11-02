@@ -1,5 +1,5 @@
 // Love Theorem Frontend JavaScript - COMPLETE FIXED VERSION
-const API_BASE = "https://love-theorem-backend.onrender.com/api";
+const API_BASE = "https://love-theorem-backend.onrender.com";
 
 // User ID management for privacy
 let USER_ID = localStorage.getItem("loveTheoremUserId");
@@ -255,418 +255,108 @@ function createParticles() {
 
 // ========== FILE UPLOAD AND ANALYSIS - FIXED VERSION ==========
 
-function setupFileUpload() {
-  const uploadArea = document.getElementById("uploadArea");
-  const fileInput = document.getElementById("fileInput");
+// Handle file upload process
+async function handleFileUpload(file) {
+  console.log("Starting file upload:", file.name);
+
   const progressBar = document.getElementById("progressBar");
   const progressFill = document.getElementById("progressFill");
   const analysisResult = document.getElementById("analysisResult");
-  const dashboardLink = document.getElementById("dashboardLink");
 
-  if (!uploadArea || !fileInput) return;
-
-  // Clear any existing event listeners by cloning
-  const newUploadArea = uploadArea.cloneNode(true);
-  const newFileInput = fileInput.cloneNode(true);
-  uploadArea.parentNode.replaceChild(newUploadArea, uploadArea);
-  fileInput.parentNode.replaceChild(newFileInput, fileInput);
-
-  // Get new references
-  const updatedUploadArea = document.getElementById("uploadArea");
-  const updatedFileInput = document.getElementById("fileInput");
-
-  // Update file input to accept both .txt and .zip files
-  updatedFileInput.setAttribute("accept", ".txt,.zip");
-
-  updatedUploadArea.addEventListener("click", () => updatedFileInput.click());
-
-  updatedUploadArea.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    updatedUploadArea.classList.add("drag-over");
-    updatedUploadArea.style.borderColor = "#ff6b6b";
-    updatedUploadArea.style.background = "rgba(255, 107, 107, 0.1)";
-  });
-
-  updatedUploadArea.addEventListener("dragleave", () => {
-    updatedUploadArea.classList.remove("drag-over");
-    updatedUploadArea.style.borderColor = "";
-    updatedUploadArea.style.background = "";
-  });
-
-  updatedUploadArea.addEventListener("drop", (e) => {
-    e.preventDefault();
-    updatedUploadArea.classList.remove("drag-over");
-    updatedUploadArea.style.borderColor = "";
-    updatedUploadArea.style.background = "";
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      updatedFileInput.files = files;
-      handleFileUpload(files[0]);
-    }
-  });
-
-  updatedFileInput.addEventListener("change", (e) => {
-    if (e.target.files.length > 0) {
-      handleFileUpload(e.target.files[0]);
-    }
-  });
-
-  async function handleFileUpload(file) {
-    console.log("File selected:", file.name, file.type, file.size);
-
-    // Validate file type
-    const isTxtFile = file.name.toLowerCase().endsWith(".txt");
-    const isZipFile = file.name.toLowerCase().endsWith(".zip");
-
-    if (!isTxtFile && !isZipFile) {
-      showError({
-        title: "Unsupported File Type",
-        message: `"${file.name}" is not a supported file type.`,
-        details:
-          "Please upload a .txt file or .zip file containing .txt files.",
-        errorType: "FILE_TYPE_ERROR",
-      });
-      return;
-    }
-
-    if (file.size === 0) {
-      showError({
-        title: "Empty File",
-        message: "The file you uploaded is completely empty (0 bytes).",
-        details: "Please export a valid WhatsApp chat and try again.",
-        errorType: "EMPTY_FILE",
-      });
-      return;
-    }
-
-    // Enhanced file size validation with specific messages
-    const maxTxtSize = 50 * 1024 * 1024; // 50MB
-    const maxZipSize = 100 * 1024 * 1024; // 100MB
-
-    if (isTxtFile && file.size > maxTxtSize) {
-      showError({
-        title: "File Too Large",
-        message: `Text file is too large (${(file.size / 1024 / 1024).toFixed(
-          2
-        )}MB).`,
-        details:
-          "Maximum allowed size for text files is 50MB. Try exporting without media or split your chat.",
-        errorType: "FILE_TOO_LARGE",
-      });
-      return;
-    }
-
-    if (isZipFile && file.size > maxZipSize) {
-      showError({
-        title: "File Too Large",
-        message: `ZIP file is too large (${(file.size / 1024 / 1024).toFixed(
-          2
-        )}MB).`,
-        details:
-          "Maximum allowed size for ZIP files is 100MB. Try exporting without media.",
-        errorType: "FILE_TOO_LARGE",
-      });
-      return;
-    }
-
-    console.log("Starting file upload...");
+  // Reset state
+  if (analysisResult) analysisResult.classList.add("hidden");
+  if (progressBar) {
     progressBar.classList.remove("hidden");
     progressFill.style.width = "0%";
-
-    try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append("file", file);
-
-      // Show upload progress
-      let progress = 0;
-      const progressInterval = setInterval(() => {
-        progress += Math.random() * 10;
-        if (progress >= 80) {
-          progress = 80;
-          clearInterval(progressInterval);
-        }
-        progressFill.style.width = `${progress}%`;
-      }, 200);
-
-      // Send to backend for analysis
-      const response = await fetch(`${API_BASE}/analyze`, {
-        method: "POST",
-        body: formData,
-      });
-
-      clearInterval(progressInterval);
-      progressFill.style.width = "100%";
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        // Handle different types of backend errors
-        let errorTitle = "Upload Failed";
-        let errorDetails = result.details || "Please try again.";
-
-        switch (result.error) {
-          case "NO_FILE_UPLOADED":
-            errorTitle = "No File Selected";
-            errorDetails = "Please select a file before uploading.";
-            break;
-          case "FILE_VALIDATION_FAILED":
-            errorTitle = "Invalid File";
-            break;
-          case "FILE_PROCESSING_FAILED":
-            errorTitle = "File Processing Error";
-            break;
-          case "EMPTY_CONTENT":
-            errorTitle = "Empty File Content";
-            break;
-          case "INVALID_CHAT_FORMAT":
-            errorTitle = "Invalid Chat Format";
-            errorDetails =
-              "The file doesn't appear to be a valid WhatsApp chat export.";
-            break;
-          case "INSUFFICIENT_PARTICIPANTS":
-            errorTitle = "Not Enough Participants";
-            errorDetails =
-              "Love Theorem analyzes conversations between two people. This chat appears to have only one participant.";
-            break;
-          case "NO_VALID_MESSAGES":
-            errorTitle = "No Valid Messages Found";
-            errorDetails =
-              "Could not find any messages with proper timestamps in the chat file.";
-            break;
-          case "SERVER_ERROR":
-            errorTitle = "Server Error";
-            errorDetails =
-              "An unexpected error occurred on our server. Please try again later.";
-            break;
-        }
-
-        throw new Error(
-          JSON.stringify({
-            title: errorTitle,
-            message: result.userFriendly || result.message,
-            details: errorDetails,
-            errorType: result.error,
-            warnings: result.warnings || [],
-          })
-        );
-      }
-
-      console.log("Analysis successful:", result);
-
-      if (!result.participants || result.participants.length < 2) {
-        throw new Error(
-          JSON.stringify({
-            title: "Analysis Issue",
-            message: "Could not find enough participants in the chat.",
-            details: "Make sure it's a conversation between at least 2 people.",
-            errorType: "INSUFFICIENT_PARTICIPANTS",
-          })
-        );
-      }
-
-      // Save to history
-      const chatName = `Chat with ${result.participants.join(" & ")}`;
-      const analysisId = await saveAnalysisToHistory(result, chatName);
-
-      if (analysisId) {
-        console.log("Analysis saved to history:", analysisId);
-      }
-
-      // Store result for dashboard
-      localStorage.setItem("lastAnalysisResult", JSON.stringify(result));
-
-      // Show success
-      showSuccess(result, isZipFile, result.warnings || []);
-
-      // Show dashboard link
-      if (dashboardLink) {
-        dashboardLink.classList.remove("hidden");
-      }
-
-      // Auto-navigate to dashboard after 3 seconds
-      setTimeout(() => {
-        navigateToPage("dashboard.html");
-      }, 5000);
-    } catch (error) {
-      console.error("Error analyzing chat:", error);
-      console.error("Full error object:", JSON.stringify(error, null, 2));
-
-      let errorData;
-
-      try {
-        // Check if error.message is a JSON string
-        if (error.message && error.message.startsWith("{")) {
-          errorData = JSON.parse(error.message);
-        }
-        // Check if error is already an object with the structure we expect
-        else if (error.userFriendly || error.message) {
-          errorData = error;
-        }
-        // Handle case where we get [object Object]
-        else if (error.message === "[object Object]") {
-          errorData = {
-            title: "Upload Failed",
-            message: "There was an issue processing your ZIP file.",
-            details: "The file might be corrupted or in an unexpected format.",
-            errorType: "ZIP_PROCESSING_ERROR",
-          };
-        }
-        // Fallback for string errors
-        else {
-          errorData = {
-            title: "Upload Failed",
-            message: error.message || "An unknown error occurred",
-            details: "Please check your file and try again.",
-            errorType: "UNKNOWN_ERROR",
-          };
-        }
-      } catch (e) {
-        // Ultimate fallback
-        errorData = {
-          title: "Upload Failed",
-          message: "An unexpected error occurred while processing your file.",
-          details: "Please try again with a different file or contact support.",
-          errorType: "UNEXPECTED_ERROR",
-        };
-      }
-
-      showError(errorData);
-
-      // Reset progress bar on error
-      if (progressBar && progressFill) {
-        progressBar.classList.add("hidden");
-        progressFill.style.width = "0%";
-      }
-    }
   }
 
-  // Enhanced error display function
-  function showError(errorData) {
-    const analysisResult = document.getElementById("analysisResult");
-    if (!analysisResult) return;
+  // Validate file
+  const allowedExtensions = [".txt", ".zip"];
+  const fileExtension = file.name
+    .toLowerCase()
+    .slice(file.name.lastIndexOf("."));
 
-    // Ensure errorData has the expected structure
-    const {
-      title = "Upload Failed",
-      message = "An unknown error occurred",
-      details = "Please try again.",
-      errorType = "UNKNOWN_ERROR",
-      warnings = [],
-    } = errorData;
+  if (!allowedExtensions.includes(fileExtension)) {
+    showError(
+      `Unsupported file format: ${file.name}<br>Please upload .txt or .zip files only.`
+    );
+    return;
+  }
 
-    console.log("Displaying error:", {
-      title,
-      message,
-      details,
-      errorType,
-      warnings,
+  if (file.size === 0) {
+    showError("The file is empty. Please export a valid WhatsApp chat.");
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Show progress
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      progress += Math.random() * 10;
+      if (progress >= 80) {
+        progress = 80;
+        clearInterval(progressInterval);
+      }
+      progressFill.style.width = `${progress}%`;
+    }, 200);
+
+    // Send to backend
+    const response = await fetch(`${API_BASE}/analyze`, {
+      method: "POST",
+      body: formData,
     });
 
-    let warningSection = "";
-    if (warnings && warnings.length > 0) {
-      warningSection = `
-      <div class="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-4">
-        <h4 class="font-bold text-yellow-300 mb-2">⚠️ Notes:</h4>
-        <ul class="text-sm text-yellow-200 space-y-1">
-          ${warnings.map((warning) => `<li>• ${warning}</li>`).join("")}
-        </ul>
-      </div>
-    `;
+    clearInterval(progressInterval);
+    progressFill.style.width = "100%";
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || `Server error: ${response.status}`);
     }
 
-    // Specific help based on error type
-    let specificHelp = "";
-    if (errorType.includes("ZIP") || errorType.includes("FILE")) {
-      specificHelp = `
-      <div class="bg-blue-500/20 p-3 rounded-lg mb-4">
-        <p class="text-sm text-blue-200">
-          <strong>💡 ZIP File Help:</strong><br>
-          • Make sure your ZIP file contains a .txt file from WhatsApp<br>
-          • Try exporting from WhatsApp as "WITHOUT MEDIA" first<br>
-          • Ensure the file is not corrupted or password protected
-        </p>
-      </div>
-    `;
+    const result = await response.json();
+    console.log("Analysis successful:", result);
+
+    // Store result and show success
+    localStorage.setItem("lastAnalysisResult", JSON.stringify(result));
+    showSuccess(result, file.name);
+
+    // Auto-navigate to dashboard
+    setTimeout(() => {
+      navigateToPage("dashboard.html");
+    }, 3000);
+  } catch (error) {
+    console.error("Error analyzing chat:", error);
+    showError(`Analysis failed: ${error.message}`);
+
+    // Reset on error
+    if (progressBar) {
+      progressBar.classList.add("hidden");
+      progressFill.style.width = "0%";
     }
-
-    analysisResult.classList.remove("hidden");
-    analysisResult.innerHTML = `
-    <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-6">
-      <div class="text-center mb-4">
-        <div class="text-4xl mb-2">❌</div>
-        <h3 class="text-xl font-bold text-red-300 mb-2">${title}</h3>
-        <p class="text-red-200 mb-2">${message}</p>
-        <p class="text-sm text-red-200/80">${details}</p>
-      </div>
-      
-      ${warningSection}
-      ${specificHelp}
-
-      <div class="bg-white/10 rounded-lg p-4 mb-4">
-        <h4 class="font-bold mb-3 text-center">📱 How to Export Correctly:</h4>
-        <ol class="text-sm space-y-2 text-left">
-          <li class="flex items-start">
-            <span class="bg-pink-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">1</span>
-            <span>Open WhatsApp → Open the conversation</span>
-          </li>
-          <li class="flex items-start">
-            <span class="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">2</span>
-            <span>Tap contact/group name → <strong>Export Chat</strong></span>
-          </li>
-          <li class="flex items-start">
-            <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">3</span>
-            <span>Choose <strong class="text-green-400">"WITHOUT MEDIA"</strong> (recommended)</span>
-          </li>
-          <li class="flex items-start">
-            <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">4</span>
-            <span>Save and upload the .txt or .zip file here</span>
-          </li>
-        </ol>
-      </div>
-
-      <div class="text-center space-y-2">
-        <button onclick="resetUploadForm()" 
-                class="px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-full text-white text-sm transition transform hover:scale-105 mx-2">
-          🔄 Try Again
-        </button>
-        <button onclick="showDetailedHelp()" 
-                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-full text-white text-sm transition transform hover:scale-105 mx-2">
-          💡 Detailed Help
-        </button>
-      </div>
-    </div>
-  `;
   }
+}
 
-  // Enhanced success display with warnings
-  function showSuccess(result, isZipFile, warnings = []) {
-    const analysisResult = document.getElementById("analysisResult");
-    if (!analysisResult) return;
+// Show success message
+function showSuccess(result, fileName = "") {
+  const analysisResult = document.getElementById("analysisResult");
+  if (!analysisResult) return;
 
-    const fileTypeNote = isZipFile
-      ? "📦 ZIP file processed successfully - .txt file extracted automatically!"
-      : "📄 TXT file processed successfully!";
+  const isZipFile = fileName.toLowerCase().endsWith(".zip");
 
-    let warningSection = "";
-    if (warnings.length > 0) {
-      warningSection = `
-      <div class="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-4">
-        <h4 class="font-bold text-yellow-300 mb-2">⚠️ Notes:</h4>
-        <ul class="text-sm text-yellow-200 space-y-1">
-          ${warnings.map((warning) => `<li>• ${warning}</li>`).join("")}
-        </ul>
-      </div>
-    `;
-    }
-
-    analysisResult.classList.remove("hidden");
-    analysisResult.innerHTML = `
+  analysisResult.classList.remove("hidden");
+  analysisResult.innerHTML = `
     <div class="bg-green-500/20 border border-green-500/30 rounded-lg p-6 text-center">
       <div class="text-4xl mb-4">🎉</div>
       <h3 class="text-2xl font-bold mb-2 text-green-300">Analysis Complete!</h3>
-      <p class="text-sm mb-4 text-green-200">${fileTypeNote}</p>
-      ${warningSection}
+      ${
+        isZipFile
+          ? `<p class="text-sm mb-2">📦 ZIP file processed successfully</p>`
+          : ""
+      }
       <div class="score-display mb-4">${result.loveScore}%</div>
       <p class="text-sm opacity-80 mb-2">Participants: ${result.participants.join(
         " & "
@@ -674,162 +364,42 @@ function setupFileUpload() {
       <p class="text-sm opacity-80">Total Messages: ${
         result.counts.totalMessages
       }</p>
-      <p class="text-xs opacity-60 mt-4">Redirecting to dashboard in 5 seconds...</p>
-      
-      <div class="mt-4">
-        <button onclick="navigateToPage('dashboard.html')" 
-                class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-full text-white text-sm transition transform hover:scale-105">
-          🚀 Go to Dashboard Now
-        </button>
-      </div>
+      <p class="text-xs opacity-60 mt-4">Redirecting to dashboard...</p>
     </div>
   `;
-  }
+}
 
-  // Additional help function
-  function showDetailedHelp() {
-    const analysisResult = document.getElementById("analysisResult");
-    if (!analysisResult) return;
+// Show error message
+function showError(message) {
+  const analysisResult = document.getElementById("analysisResult");
+  if (!analysisResult) return;
 
-    analysisResult.innerHTML = `
-    <div class="bg-blue-500/20 border border-blue-500/30 rounded-lg p-6">
-      <div class="text-center mb-4">
-        <div class="text-4xl mb-2">💡</div>
-        <h3 class="text-xl font-bold text-blue-300 mb-2">Detailed Help Guide</h3>
-      </div>
-
-      <div class="space-y-4">
-        <div class="bg-white/10 p-4 rounded-lg">
-          <h4 class="font-bold text-blue-300 mb-2">📱 Step-by-Step WhatsApp Export:</h4>
-          <ol class="text-sm space-y-2 text-left">
-            <li><strong>Open WhatsApp</strong> on your phone</li>
-            <li><strong>Go to the specific chat</strong> you want to analyze</li>
-            <li><strong>Tap the contact/group name</strong> at the top</li>
-            <li><strong>Scroll down</strong> and tap <strong>"Export Chat"</strong></li>
-            <li>Choose <strong>"WITHOUT MEDIA"</strong> (recommended for smaller files)</li>
-            <li><strong>Share/Save</strong> the file to your device</li>
-            <li><strong>Upload</strong> the .txt or .zip file here</li>
-          </ol>
-        </div>
-
-        <div class="bg-white/10 p-4 rounded-lg">
-          <h4 class="font-bold text-green-300 mb-2">✅ What Works:</h4>
-          <ul class="text-sm space-y-1">
-            <li>• Personal chats (1-on-1 conversations)</li>
-            <li>• Group chats (we'll analyze the two most active participants)</li>
-            <li>• Both .txt files and .zip files (with media)</li>
-            <li>• Chats from any time period</li>
-            <li>• Multiple languages supported</li>
-          </ul>
-        </div>
-
-        <div class="bg-white/10 p-4 rounded-lg">
-          <h4 class="font-bold text-red-300 mb-2">❌ Common Issues:</h4>
-          <ul class="text-sm space-y-1">
-            <li>• Uploading wrong file type (images, documents, etc.)</li>
-            <li>• Corrupted or incomplete exports</li>
-            <li>• Chats with only one participant</li>
-            <li>• Very short conversations (less than 10 messages)</li>
-            <li>• Files larger than 50MB (.txt) or 100MB (.zip)</li>
-          </ul>
-        </div>
-
-        <div class="bg-white/10 p-4 rounded-lg">
-          <h4 class="font-bold text-purple-300 mb-2">🔧 Troubleshooting:</h4>
-          <ul class="text-sm space-y-1">
-            <li>• <strong>File too large?</strong> Export "WITHOUT MEDIA"</li>
-            <li>• <strong>Wrong format?</strong> Make sure it's from WhatsApp Export</li>
-            <li>• <strong>Empty analysis?</strong> Check if chat has enough messages</li>
-            <li>• <strong>Still stuck?</strong> Contact support with your file details</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="text-center mt-4">
-        <button onclick="resetUploadForm()" 
-                class="px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-full text-white text-sm transition transform hover:scale-105">
-          🔄 Try Uploading Again
-        </button>
-      </div>
+  analysisResult.classList.remove("hidden");
+  analysisResult.innerHTML = `
+    <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-6 text-center">
+      <div class="text-4xl mb-4">❌</div>
+      <h3 class="text-xl font-bold text-red-300 mb-2">Upload Failed</h3>
+      <p class="text-red-200 mb-4">${message}</p>
+      <button onclick="resetUploadForm()" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-full text-white">
+        Try Again
+      </button>
     </div>
   `;
-  }
+}
 
-  function showSuccess(result, isZipFile) {
-    if (!analysisResult) return;
+// Reset upload form
+function resetUploadForm() {
+  const fileInput = document.getElementById("fileInput");
+  const progressBar = document.getElementById("progressBar");
+  const progressFill = document.getElementById("progressFill");
+  const analysisResult = document.getElementById("analysisResult");
+  const dashboardLink = document.getElementById("dashboardLink");
 
-    const fileTypeNote = isZipFile
-      ? "📦 ZIP file processed successfully - .txt file extracted automatically!"
-      : "📄 TXT file processed successfully!";
-
-    analysisResult.classList.remove("hidden");
-    analysisResult.innerHTML = `
-      <div class="bg-green-500/20 border border-green-500/30 rounded-lg p-6 text-center">
-        <div class="text-4xl mb-4">🎉</div>
-        <h3 class="text-2xl font-bold mb-2 text-green-300">Analysis Complete!</h3>
-        <p class="text-sm mb-4 text-green-200">${fileTypeNote}</p>
-        <div class="score-display mb-4">${result.loveScore}%</div>
-        <p class="text-sm opacity-80 mb-2">Participants: ${result.participants.join(
-          " & "
-        )}</p>
-        <p class="text-sm opacity-80">Total Messages: ${
-          result.counts.totalMessages
-        }</p>
-        <p class="text-xs opacity-60 mt-4">Redirecting to dashboard...</p>
-      </div>
-    `;
-  }
-
-  function showError(message, isZipFile) {
-    if (!analysisResult) return;
-
-    const fileTypeSpecificHelp = isZipFile
-      ? `<div class="bg-yellow-500/20 p-3 rounded-lg mb-4">
-        <p class="text-sm text-yellow-200">💡 <strong>ZIP File Tip:</strong> Make sure your ZIP contains a .txt file exported from WhatsApp</p>
-      </div>`
-      : "";
-
-    analysisResult.classList.remove("hidden");
-    analysisResult.innerHTML = `
-      <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-6">
-        <div class="text-center mb-4">
-          <div class="text-4xl mb-2">❌</div>
-          <h3 class="text-xl font-bold text-red-300 mb-2">Upload Failed</h3>
-          <p class="text-red-200 mb-4">${message}</p>
-        </div>
-        
-        ${fileTypeSpecificHelp}
-
-        <div class="bg-white/10 rounded-lg p-4 mb-4">
-          <h4 class="font-bold mb-3 text-center">📱 How to Export WhatsApp Chat Correctly:</h4>
-          <ol class="text-sm space-y-2 text-left">
-            <li class="flex items-start">
-              <span class="bg-pink-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">1</span>
-              <span>Open the WhatsApp conversation you want to analyze</span>
-            </li>
-            <li class="flex items-start">
-              <span class="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">2</span>
-              <span>Tap the contact/group name at the top → <strong>Export Chat</strong></span>
-            </li>
-            <li class="flex items-start">
-              <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">3</span>
-              <span>Choose <strong class="text-green-400">"WITHOUT MEDIA"</strong> (Recommended) or "WITH MEDIA"</span>
-            </li>
-            <li class="flex items-start">
-              <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">4</span>
-              <span>Save the file and upload it here (.txt or .zip both work!)</span>
-            </li>
-          </ol>
-        </div>
-
-        <div class="text-center">
-          <button onclick="resetUploadForm()" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-full text-white text-sm transition transform hover:scale-105">
-            Try Again
-          </button>
-        </div>
-      </div>
-    `;
-  }
+  if (fileInput) fileInput.value = "";
+  if (progressBar) progressBar.classList.add("hidden");
+  if (progressFill) progressFill.style.width = "0%";
+  if (analysisResult) analysisResult.classList.add("hidden");
+  if (dashboardLink) dashboardLink.classList.add("hidden");
 }
 
 // Reset upload form
@@ -1110,28 +680,47 @@ function showExplorePage() {
         Upload your WhatsApp chat export to discover hidden patterns and emotional connections ✨
       </p>
       
-      <div class="upload-area mb-6" id="uploadArea">
+      <!-- Upload Area -->
+      <div class="upload-area mb-6" id="uploadArea" 
+           style="border: 2px dashed rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); padding: 3rem; cursor: pointer; border-radius: 1rem; transition: all 0.3s ease;">
         <i class="fas fa-cloud-upload-alt text-4xl mb-4"></i>
-        <p class="mb-2 font-semibold">Upload WhatsApp Chat Export</p>
+        <p class="mb-2 font-semibold text-lg">Click to Upload WhatsApp Chat</p>
         <p class="text-sm opacity-70 mb-2">Drag & drop your .txt or .zip file or click to browse</p>
         <p class="text-xs opacity-50">
-          Supports: .txt files directly or .zip files containing .txt files<br>
-          WhatsApp exports with/without media both work!
+          Supports: .txt files or .zip files containing .txt files<br>
+          File must be exported from WhatsApp without media
         </p>
         <input type="file" id="fileInput" class="hidden" accept=".txt,.zip">
       </div>
       
-      <div class="progress-bar mb-4 hidden" id="progressBar">
-        <div class="progress-fill" id="progressFill"></div>
+      <!-- File Type Info -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white/10 backdrop-blur-lg rounded-lg p-4 border border-white/20">
+          <div class="text-2xl mb-2">📄</div>
+          <h4 class="font-bold mb-2">Single .TXT File</h4>
+          <p class="text-xs opacity-70">Direct WhatsApp chat export</p>
+        </div>
+        <div class="bg-white/10 backdrop-blur-lg rounded-lg p-4 border border-white/20">
+          <div class="text-2xl mb-2">📦</div>
+          <h4 class="font-bold mb-2">ZIP Archive</h4>
+          <p class="text-xs opacity-70">Multiple chat exports in one file</p>
+        </div>
       </div>
       
+      <!-- Progress Bar -->
+      <div class="progress-bar mb-4 hidden" id="progressBar" 
+           style="width: 100%; background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+        <div class="progress-fill" id="progressFill" 
+             style="height: 100%; background: linear-gradient(90deg, #ec4899, #8b5cf6); width: 0%; transition: width 0.3s ease;"></div>
+      </div>
+      
+      <!-- Results Area -->
       <div id="analysisResult" class="hidden"></div>
       
-      <button
-        onclick="navigateToPage('dashboard.html')"
-        class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-full text-white hidden"
-        id="dashboardLink"
-      >
+      <!-- Dashboard Link -->
+      <button onclick="navigateToPage('dashboard.html')" 
+              class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-full text-white hidden mt-4" 
+              id="dashboardLink">
         Go to Dashboard →
       </button>
       
@@ -1141,9 +730,136 @@ function showExplorePage() {
   `;
 
   // Initialize file upload functionality
-  setTimeout(() => {
-    setupFileUpload();
-  }, 100);
+  initializeFileUpload();
+}
+
+// NEW: Simple file upload initialization
+function initializeFileUpload() {
+  console.log("Initializing file upload...");
+
+  const uploadArea = document.getElementById("uploadArea");
+  const fileInput = document.getElementById("fileInput");
+
+  if (!uploadArea || !fileInput) {
+    console.error("Upload elements not found!");
+    return;
+  }
+
+  // Click handler
+  uploadArea.addEventListener("click", function () {
+    console.log("Upload area clicked");
+    fileInput.click();
+  });
+
+  // File selection handler
+  fileInput.addEventListener("change", function (e) {
+    console.log("File selected:", e.target.files[0]);
+    if (e.target.files.length > 0) {
+      handleFileUpload(e.target.files[0]);
+    }
+  });
+
+  // Drag and drop handlers
+  uploadArea.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    uploadArea.style.borderColor = "#ec4899";
+    uploadArea.style.background = "rgba(236, 72, 153, 0.1)";
+  });
+
+  uploadArea.addEventListener("dragleave", function () {
+    uploadArea.style.borderColor = "rgba(255,255,255,0.3)";
+    uploadArea.style.background = "rgba(255,255,255,0.05)";
+  });
+
+  uploadArea.addEventListener("drop", function (e) {
+    e.preventDefault();
+    uploadArea.style.borderColor = "rgba(255,255,255,0.3)";
+    uploadArea.style.background = "rgba(255,255,255,0.05)";
+
+    if (e.dataTransfer.files.length > 0) {
+      fileInput.files = e.dataTransfer.files;
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  });
+
+  console.log("File upload initialized successfully");
+}
+
+// Show success message after analysis
+function showSuccess(result, fileName = "") {
+  const analysisResult = document.getElementById("analysisResult");
+  if (!analysisResult) return;
+
+  const fileExtension = fileName
+    ? fileName.slice(fileName.lastIndexOf(".")).toUpperCase()
+    : "";
+  const isZipFile = fileExtension === ".ZIP";
+
+  analysisResult.classList.remove("hidden");
+  analysisResult.innerHTML = `
+    <div class="bg-green-500/20 border border-green-500/30 rounded-lg p-6 text-center">
+      <div class="text-4xl mb-4">🎉</div>
+      <h3 class="text-2xl font-bold mb-2 text-green-300">Analysis Complete!</h3>
+      ${
+        isZipFile
+          ? `<p class="text-sm mb-2">📦 ZIP file processed successfully</p>`
+          : ""
+      }
+      <div class="score-display mb-4">${result.loveScore}%</div>
+      <p class="text-sm opacity-80 mb-2">Participants: ${result.participants.join(
+        " & "
+      )}</p>
+      <p class="text-sm opacity-80">Total Messages: ${
+        result.counts.totalMessages
+      }</p>
+      <p class="text-xs opacity-60 mt-4">Redirecting to dashboard...</p>
+    </div>
+  `;
+}
+
+// Show error message
+function showError(message) {
+  const analysisResult = document.getElementById("analysisResult");
+  if (!analysisResult) return;
+
+  analysisResult.classList.remove("hidden");
+  analysisResult.innerHTML = `
+    <div class="bg-red-500/20 border border-red-500/30 rounded-lg p-6">
+      <div class="text-center mb-4">
+        <div class="text-4xl mb-2">❌</div>
+        <h3 class="text-xl font-bold text-red-300 mb-2">Upload Failed</h3>
+        <p class="text-red-200 mb-4">${message}</p>
+      </div>
+      
+      <div class="bg-white/10 rounded-lg p-4 mb-4">
+        <h4 class="font-bold mb-3 text-center">📱 How to Export WhatsApp Chat Correctly:</h4>
+        <ol class="text-sm space-y-2 text-left">
+          <li class="flex items-start">
+            <span class="bg-pink-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">1</span>
+            <span>Open the WhatsApp conversation you want to analyze</span>
+          </li>
+          <li class="flex items-start">
+            <span class="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">2</span>
+            <span>Tap the contact/group name at the top → <strong>Export Chat</strong></span>
+          </li>
+          <li class="flex items-start">
+            <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">3</span>
+            <span>Choose <strong class="text-green-400">"WITHOUT MEDIA"</strong> (Important!)</span>
+          </li>
+          <li class="flex items-start">
+            <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2 flex-shrink-0">4</span>
+            <span>Save the .txt file and upload it here</span>
+          </li>
+        </ol>
+      </div>
+
+      <div class="text-center">
+        <button onclick="resetUploadForm()" class="px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-full text-white text-sm transition transform hover:scale-105">
+          Try Again
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 function showDashboardPage(analysisData = null) {
