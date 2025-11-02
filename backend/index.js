@@ -2,6 +2,11 @@
 // Upload WhatsApp .txt or .zip export and compute Love Theorem score
 
 const express = require("express");
+const cors = require("cors");
+app.use(cors({
+  origin: "https://love-theorem-frontend.onrender.com"
+}));
+
 const multer = require("multer");
 const cors = require("cors");
 const fs = require("fs");
