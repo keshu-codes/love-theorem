@@ -235,190 +235,38 @@ function validateUploadedFile(file) {
 }
 
 // ========== HEALTH CHECK ROUTES ==========
+// ========== HEALTH CHECK ROUTES ==========
 app.get("/", (req, res) => {
-  res.json({
-    status: "OK",
+  console.log("✅ Root health check received");
+  res.json({ 
+    status: "OK", 
     message: "Love Theorem Backend is running!",
-    timestamp: new Date().toISOString(),
-    features: [
-      "txt-file-analysis",
-      "zip-file-support",
-      "user-privacy",
-      "enhanced-error-handling",
-    ],
+    timestamp: new Date().toISOString()
   });
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    status: "healthy",
+  console.log("✅ API Health check received");
+  res.json({ 
+    status: "healthy", 
     service: "Love Theorem API",
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   });
 });
 
-// ========== ENHANCED API ROUTE WITH COMPREHENSIVE ERROR HANDLING ==========
-app.post("/api/analyze", upload.single("file"), (req, res) => {
-  console.log("📤 File upload received");
-
-  try {
-    if (!req.file) {
-      console.log("❌ No file uploaded");
-      return res.status(400).json({
-        success: false,
-        error: "NO_FILE_UPLOADED",
-        message: "No file was uploaded.",
-        details:
-          'Please select a file before uploading. Make sure you are sending a file with the field name "file".',
-        userFriendly:
-          "Please select a file to upload. Drag and drop or click to browse for your WhatsApp chat export.",
-      });
-    }
-
-    const file = req.file;
-
-    // Step 1: Validate the uploaded file
-    const validation = validateUploadedFile(file);
-
-    if (validation.errors.length > 0) {
-      console.log("❌ File validation failed:", validation.errors);
-      return res.status(400).json({
-        success: false,
-        error: "FILE_VALIDATION_FAILED",
-        message: "File validation failed",
-        details: validation.errors.join(" "),
-        userFriendly: validation.errors.join(" "),
-        warnings: validation.warnings,
-      });
-    }
-
-    let textContent;
-    const { isTxtFile, isZipFile, warnings } = validation;
-
-    // Step 2: Process the file based on type
-    try {
-      if (isZipFile) {
-        console.log("🔍 Detected ZIP file, extracting...");
-        textContent = extractTextFromZip(file.buffer, file.originalname);
-      } else if (isTxtFile) {
-        console.log("🔍 Detected TXT file, reading directly...");
-        textContent = file.buffer.toString("utf8");
-
-        // Additional validation for direct text files
-        if (!textContent || textContent.trim().length === 0) {
-          throw new Error(
-            "The text file is empty or contains no readable content."
-          );
-        }
-
-        if (textContent.length > 50 * 1024 * 1024) {
-          throw new Error("Text file content is too large to process.");
-        }
-      }
-    } catch (processingError) {
-      console.error("❌ File processing failed:", processingError);
-      return res.status(400).json({
-        success: false,
-        error: "FILE_PROCESSING_FAILED",
-        message: "Failed to process the uploaded file",
-        details: processingError.message,
-        userFriendly: processingError.message,
-        warnings: warnings,
-      });
-    }
-
-    // Step 3: Validate text content
-    if (!textContent || textContent.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "EMPTY_CONTENT",
-        message: "File contains no readable text content",
-        details: "The file appears to be empty or contains no readable text.",
-        userFriendly:
-          "The uploaded file contains no readable text. Please export your WhatsApp chat again.",
-        warnings: warnings,
-      });
-    }
-
-    console.log(`📊 Text content length: ${textContent.length} characters`);
-
-    // Step 4: Check if it looks like a WhatsApp chat
-    const firstFewLines = textContent.split("\n").slice(0, 10).join("\n");
-    const whatsAppPattern =
-      /\d{1,2}\/\d{1,2}\/\d{4},\s+\d{1,2}:\d{2}\s*(?:am|pm)?\s*-\s*.+?:/i;
-
-    if (!whatsAppPattern.test(firstFewLines)) {
-      warnings.push(
-        "The file format doesn't look like a standard WhatsApp export. Analysis may not work correctly."
-      );
-      console.warn(
-        "⚠️ File may not be standard WhatsApp format. Sample:",
-        firstFewLines.substring(0, 500)
-      );
-    }
-
-    // Step 5: Perform analysis
-    try {
-      const result = analyzeChat(textContent);
-      console.log("✅ Analysis completed successfully");
-
-      // Add warnings to result if any
-      if (warnings.length > 0) {
-        result.warnings = warnings;
-      }
-
-      res.json({
-        success: true,
-        ...result,
-        fileType: isZipFile ? "zip" : "txt",
-        originalFilename: file.originalname,
-      });
-    } catch (analysisError) {
-      console.error("❌ Chat analysis failed:", analysisError);
-
-      let userFriendlyError = analysisError.message;
-      let errorCode = "ANALYSIS_FAILED";
-
-      // Provide more user-friendly messages for common analysis errors
-      if (analysisError.message.includes("No messages could be parsed")) {
-        errorCode = "INVALID_CHAT_FORMAT";
-        userFriendlyError =
-          "Could not read any messages from the chat file. Please make sure you exported the chat correctly from WhatsApp.";
-      } else if (
-        analysisError.message.includes("Need at least two participants")
-      ) {
-        errorCode = "INSUFFICIENT_PARTICIPANTS";
-        userFriendlyError =
-          "The chat appears to be a conversation with only one person. Love Theorem analyzes conversations between two people.";
-      } else if (analysisError.message.includes("No valid messages")) {
-        errorCode = "NO_VALID_MESSAGES";
-        userFriendlyError =
-          "No valid messages with proper timestamps were found. Please check your WhatsApp export format.";
-      }
-
-      return res.status(400).json({
-        success: false,
-        error: errorCode,
-        message: analysisError.message,
-        details:
-          "The chat analysis failed due to issues with the file content.",
-        userFriendly: userFriendlyError,
-        warnings: warnings,
-      });
-    }
-  } catch (unexpectedError) {
-    console.error("💥 Unexpected error during file upload:", unexpectedError);
-    return res.status(500).json({
-      success: false,
-      error: "SERVER_ERROR",
-      message: "An unexpected server error occurred",
-      details: unexpectedError.message,
-      userFriendly:
-        "An unexpected error occurred while processing your file. Please try again later.",
-      supportContact:
-        "If this continues, please contact support with details about your file.",
-    });
-  }
+// ========== SIMPLE TEST ENDPOINT ==========
+app.post("/api/analyze", (req, res) => {
+  console.log("📨 Analyze endpoint hit");
+  
+  // Simple test response
+  res.json({
+    success: true,
+    message: "Backend is working! File upload would be processed here.",
+    loveScore: 85,
+    participants: ["User A", "User B"],
+    counts: { totalMessages: 150 },
+    fileType: "test"
+  });
 });
 
 // ========== CHAT HISTORY API ROUTES ==========
