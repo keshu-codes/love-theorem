@@ -1,5 +1,5 @@
 // Love Theorem Frontend JavaScript - COMPLETE FIXED VERSION WITH ZIP SUPPORT
-const API_BASE = "http://localhost:10000/api";
+const API_BASE = "https://love-theorem-backend.onrender.com";
 
 // User ID management for privacy
 let USER_ID = localStorage.getItem("loveTheoremUserId");
