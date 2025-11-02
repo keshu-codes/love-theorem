@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About | Love Theorem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body
+    class="bg-gradient-to-tl from-pink-500 via-purple-500 to-indigo-500 relative min-h-screen about-page"
+  >
+    <!-- Floating Particles -->
+    <div class="particles-container" id="particlesContainer"></div>
+
+    <!-- Navbar -->
+    <div id="navbar"></div>
+
+    <!-- Morphing Blob Background -->
+    <div class="blob"></div>
+    <div class="blob-2"></div>
+    <div class="blob-3"></div>
+
+    <!-- Main Content -->
+    <div class="min-h-screen w-full pt-20">
+      <div id="content" class="w-full max-w-4xl mx-auto px-4 py-8">
+        <!-- JavaScript will populate this -->
+      </div>
+    </div>
+
+    <!-- Footer with Creator Credit -->
+    <footer
+      class="fixed bottom-0 left-0 w-full bg-black/20 backdrop-blur-lg border-t border-white/10 py-3 z-40"
+    >
+      <div
+        class="max-w-5xl mx-auto px-6 flex justify-between items-center text-white text-sm"
+      >
+        <div class="flex items-center space-x-2">
+          <span>Made with 💖 by</span>
+          <a
+            href="https://www.instagram.com/_keshab._.6?igsh=MTVvd3ZoOHBtZGEzcg=="
+            target="_blank"
+            class="font-bold text-pink-300 hover:text-pink-400 transition-colors"
+          >
+            Keshu
+          </a>
+        </div>
+        <div class="flex space-x-4">
+          <a
+            href="https://www.instagram.com/_keshab._.6?igsh=MTVvd3ZoOHBtZGEzcg=="
+            target="_blank"
+            class="hover:text-pink-300 transition-colors flex items-center space-x-1"
+          >
+            <i class="fab fa-instagram"></i>
+            <span>Instagram</span>
+          </a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+      // Show about page when this page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        showAboutPage();
+      });
+    </script>
+  </body>
+</html>
