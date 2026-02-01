@@ -1112,40 +1112,64 @@ function determineImprovements(data) {
   return improvements;
 }
 
-// ========== FIXED PARSER FOR DD/MM/YYYY FORMAT ==========
+// ========== ROBUST MESSAGE PARSER ==========
 function parseMessages(text) {
   const lines = text.split(/\r?\n/);
   const messages = [];
 
-  // WhatsApp format: DD/MM/YYYY, HH:MM am/pm - Sender: Message
-  const pattern =
-    /^(\d{1,2}\/\d{1,2}\/\d{4}),\s+(\d{1,2}:\d{2}\s?(?:am|pm)?)\s*-\s*(.+?):\s(.*)$/i;
+  // PATTERN 1: Standard WhatsApp (Android/iOS)
+  // Example: 12/25/23, 10:30 PM - Keshav: Hello
+  // Example: 25/12/2023, 10:30 am - Keshav: Hello
+  const pattern1 =
+    /^(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]m)?)\s*-\s*(.+?):\s(.*)$/i;
+
+  // PATTERN 2: Bracketed format (often iOS)
+  // Example: [25/12/23, 10:30:00 PM] Keshav: Hello
+  const pattern2 =
+    /^\[(\d{1,2}\/\d{1,2}\/\d{2,4}),\s+(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]m)?)\]\s+(.+?):\s(.*)$/i;
+
+  // PATTERN 3: Dash separator (some Android versions)
+  // Example: 25/12/23 - 10:30 PM - Keshav: Hello
+  const pattern3 =
+    /^(\d{1,2}\/\d{1,2}\/\d{2,4})\s*-\s*(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]m)?)\s*-\s*(.+?):\s(.*)$/i;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    // Remove invisible characters (LTR/RTL marks) that break parsing
+    const line = lines[i].trim().replace(/[\u200e\u200f]/g, "");
+
     if (!line) continue;
 
-    const match = line.match(pattern);
+    let match =
+      line.match(pattern1) || line.match(pattern2) || line.match(pattern3);
+
     if (match) {
       const datePart = match[1];
       const timePart = match[2];
       const sender = match[3].trim();
       const textPart = match[4].trim();
 
-      // Skip system messages
-      if (sender.includes("Messages and calls are end-to-end encrypted")) {
+      // Skip system messages (encryption notices, group adds, etc.)
+      if (
+        sender.includes("Messages and calls are end-to-end encrypted") ||
+        sender.includes("created group") ||
+        sender.includes("added you")
+      ) {
         continue;
       }
 
       const timestamp = parseWhatsAppDate(datePart, timePart);
       if (timestamp) {
         messages.push({ timestamp, sender, text: textPart });
-      } else {
-        console.log("Failed to parse date for line:", line);
+      }
+    } else {
+      // Handle multi-line messages (append to the last message)
+      if (messages.length > 0) {
+        messages[messages.length - 1].text += "\n" + line;
       }
     }
   }
 
+  console.log(`Successfully parsed ${messages.length} messages.`);
   return messages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 }
 
