@@ -270,15 +270,24 @@ async function handleFileUpload(file) {
     progressFill.style.width = "0%";
   }
 
-  // Validate file
-  const allowedExtensions = [".txt", ".zip"];
-  const fileExtension = file.name
-    .toLowerCase()
-    .slice(file.name.lastIndexOf("."));
+  // Validate file (Mobile Friendly)
+  const fileName = file.name.toLowerCase();
+  const fileType = file.type;
 
-  if (!allowedExtensions.includes(fileExtension)) {
+  // Check extension OR mime type (phones often mess up one or the other)
+  const isZip =
+    fileName.endsWith(".zip") ||
+    fileType.includes("zip") ||
+    fileType.includes("compressed");
+
+  const isTxt =
+    fileName.endsWith(".txt") ||
+    fileType === "text/plain" ||
+    (fileName.indexOf(".") === -1 && file.size < 5000000); // Allow extensionless files on mobile if small
+
+  if (!isZip && !isTxt) {
     showError(
-      `Unsupported file format: ${file.name}<br>Please upload .txt or .zip files only.`
+      `Unsupported file format: ${file.name}<br>Please upload .txt or .zip files only.`,
     );
     return;
   }
@@ -359,7 +368,7 @@ function showSuccess(result, fileName = "") {
       }
       <div class="score-display mb-4">${result.loveScore}%</div>
       <p class="text-sm opacity-80 mb-2">Participants: ${result.participants.join(
-        " & "
+        " & ",
       )}</p>
       <p class="text-sm opacity-80">Total Messages: ${
         result.counts.totalMessages
@@ -522,7 +531,7 @@ async function loadAndDisplayHistory() {
 
   const analyses = await loadAnalysisHistory();
   const analysisArray = Object.values(analyses).sort(
-    (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+    (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
   );
 
   if (analysisArray.length === 0) {
@@ -548,7 +557,7 @@ async function loadAndDisplayHistory() {
           <h3 class="text-xl font-bold mb-1">${analysis.chatName}</h3>
           <p class="text-sm opacity-70">${analysis.participants.join(" & ")}</p>
           <p class="text-xs opacity-50 mt-1">${new Date(
-            analysis.timestamp
+            analysis.timestamp,
           ).toLocaleString()}</p>
         </div>
         <div class="text-right">
@@ -584,7 +593,7 @@ async function loadAndDisplayHistory() {
         </button>
       </div>
     </div>
-  `
+  `,
     )
     .join("");
 }
@@ -690,7 +699,7 @@ function showExplorePage() {
           Supports: .txt files or .zip files containing .txt files<br>
           File must be exported from WhatsApp without media
         </p>
-        <input type="file" id="fileInput" class="hidden" accept=".txt,.zip">
+        <input type="file" id="fileInput" class="hidden" accept=".txt,.zip,text/plain,application/zip,application/x-zip-compressed,application/octet-stream">
       </div>
       
       <!-- File Type Info -->
@@ -807,7 +816,7 @@ function showSuccess(result, fileName = "") {
       }
       <div class="score-display mb-4">${result.loveScore}%</div>
       <p class="text-sm opacity-80 mb-2">Participants: ${result.participants.join(
-        " & "
+        " & ",
       )}</p>
       <p class="text-sm opacity-80">Total Messages: ${
         result.counts.totalMessages
@@ -1010,8 +1019,8 @@ function showDashboardPage(analysisData = null) {
       <div class="flex justify-between items-center p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-lg border border-green-500/30">
         <span class="font-bold text-lg">🎯 Total Raw Score</span>
         <span class="font-bold text-2xl">${analysisData.rawScore}/${
-    analysisData.maxPossible
-  }</span>
+          analysisData.maxPossible
+        }</span>
       </div>
       
       <p class="text-center text-sm opacity-70 mt-3">
@@ -1050,8 +1059,10 @@ function showDashboardPage(analysisData = null) {
               <p class="text-sm opacity-70">Messages: ${
                 analysisData.counts[personA]
               } (${Math.round(
-    (analysisData.counts[personA] / analysisData.counts.totalMessages) * 100
-  )}%)</p>
+                (analysisData.counts[personA] /
+                  analysisData.counts.totalMessages) *
+                  100,
+              )}%)</p>
               <p class="text-sm opacity-70">Words per message: ${
                 insights.wordsPerMessage && insights.wordsPerMessage[personA]
                   ? insights.wordsPerMessage[personA].toFixed(1)
@@ -1064,8 +1075,10 @@ function showDashboardPage(analysisData = null) {
               <p class="text-sm opacity-70">Messages: ${
                 analysisData.counts[personB]
               } (${Math.round(
-    (analysisData.counts[personB] / analysisData.counts.totalMessages) * 100
-  )}%)</p>
+                (analysisData.counts[personB] /
+                  analysisData.counts.totalMessages) *
+                  100,
+              )}%)</p>
               <p class="text-sm opacity-70">Words per message: ${
                 insights.wordsPerMessage && insights.wordsPerMessage[personB]
                   ? insights.wordsPerMessage[personB].toFixed(1)
@@ -1176,7 +1189,7 @@ function showDashboardPage(analysisData = null) {
                       <span class="text-2xl emoji-display">${emoji.emoji}</span>
                       <span class="text-sm">${emoji.count}</span>
                     </div>
-                  `
+                  `,
                       )
                       .join("")
                   : '<p class="text-sm opacity-70 text-center w-full">No emoji data available</p>'
@@ -1242,7 +1255,7 @@ function showDashboardPage(analysisData = null) {
                   firstMessage.sender
                 }</p>
                 <p class="text-sm mb-1"><strong>When:</strong> ${new Date(
-                  firstMessage.timestamp
+                  firstMessage.timestamp,
                 ).toLocaleDateString()}</p>
                 <p class="text-sm italic mt-2">"${firstMessage.text}"</p>
               </div>
@@ -1252,7 +1265,7 @@ function showDashboardPage(analysisData = null) {
                   lastMessage.sender
                 }</p>
                 <p class="text-sm mb-1"><strong>When:</strong> ${new Date(
-                  lastMessage.timestamp
+                  lastMessage.timestamp,
                 ).toLocaleDateString()}</p>
                 <p class="text-sm italic mt-2">"${lastMessage.text}"</p>
               </div>
@@ -1298,7 +1311,7 @@ function showDashboardPage(analysisData = null) {
                     <span class="bg-white/10 px-3 py-1 rounded-full text-sm border border-white/20">
                       ${keyword.word} (${keyword.count})
                     </span>
-                  `
+                  `,
                       )
                       .join("")
                   : '<p class="text-sm opacity-70">No keyword data available</p>'
@@ -1316,7 +1329,7 @@ function showDashboardPage(analysisData = null) {
               insights,
               personA,
               personB,
-              positivePercentage
+              positivePercentage,
             )}
           </div>
         </div>
@@ -1548,7 +1561,7 @@ function addDataLine(svg, data, color, personName) {
     // Data point circle
     const circle = document.createElementNS(
       "http://www.w3.org/2000/svg",
-      "circle"
+      "circle",
     );
     circle.setAttribute("cx", x);
     circle.setAttribute("cy", y);
@@ -1579,7 +1592,7 @@ function addDataLine(svg, data, color, personName) {
     // Value label above point
     const label = document.createElementNS(
       "http://www.w3.org/2000/svg",
-      "text"
+      "text",
     );
     label.setAttribute("x", x);
     label.setAttribute("y", y - 15);
@@ -1599,14 +1612,14 @@ function addDataLine(svg, data, color, personName) {
 function addLegend(svg, personA, personB) {
   const legendGroup = document.createElementNS(
     "http://www.w3.org/2000/svg",
-    "g"
+    "g",
   );
   legendGroup.setAttribute("class", "legend");
 
   // Legend background
   const background = document.createElementNS(
     "http://www.w3.org/2000/svg",
-    "rect"
+    "rect",
   );
   background.setAttribute("x", "350");
   background.setAttribute("y", "60");
@@ -1619,7 +1632,7 @@ function addLegend(svg, personA, personB) {
   // Person A legend item
   const personALegend = document.createElementNS(
     "http://www.w3.org/2000/svg",
-    "g"
+    "g",
   );
 
   const lineA = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -1645,7 +1658,7 @@ function addLegend(svg, personA, personB) {
   // Person B legend item
   const personBLegend = document.createElementNS(
     "http://www.w3.org/2000/svg",
-    "g"
+    "g",
   );
 
   const lineB = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -1722,7 +1735,7 @@ async function saveCurrentAnalysis() {
 
   const chatName = prompt(
     "Enter a name for this chat analysis:",
-    `Chat with ${analysisData.participants.join(" & ")}`
+    `Chat with ${analysisData.participants.join(" & ")}`,
   );
 
   if (chatName) {
@@ -1911,7 +1924,7 @@ function generateAISuggestions(
   insights,
   personA,
   personB,
-  positivePercentage
+  positivePercentage,
 ) {
   const suggestions = [];
 
@@ -1922,7 +1935,7 @@ function generateAISuggestions(
     insights.averageReplyTimes[personB]
       ? Math.abs(
           insights.averageReplyTimes[personA] -
-            insights.averageReplyTimes[personB]
+            insights.averageReplyTimes[personB],
         )
       : 0;
 
@@ -1932,7 +1945,7 @@ function generateAISuggestions(
         <h4 class="font-bold mb-2 text-purple-300">⏰ Reply Time Balance</h4>
         <p class="text-sm">
           There's a significant difference in reply times (${Math.round(
-            replyTimeDiff
+            replyTimeDiff,
           )} minutes). 
           ${
             replyTimeDiff > 60
@@ -2023,7 +2036,7 @@ function generateAISuggestions(
         <h4 class="font-bold mb-2 text-pink-300">💖 Highly Engaged!</h4>
         <p class="text-sm">
           You chat very frequently (${Math.round(
-            messagesPerDay
+            messagesPerDay,
           )} messages per day)! This shows strong connection and regular communication.
         </p>
         <p class="text-xs opacity-70 mt-2">✨ This level of engagement builds deep emotional intimacy</p>
@@ -2035,7 +2048,7 @@ function generateAISuggestions(
         <h4 class="font-bold mb-2 text-blue-300">📅 Consistency Opportunity</h4>
         <p class="text-sm">
           With ${Math.round(
-            messagesPerDay
+            messagesPerDay,
           )} messages per day, consider increasing communication frequency to strengthen your connection.
         </p>
         <p class="text-xs opacity-70 mt-2">💡 Tip: Regular check-ins, even brief ones, maintain connection</p>
