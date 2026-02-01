@@ -77,7 +77,7 @@ app.post("/api/analyze", upload.single("file"), (req, res) => {
 
   const file = req.file;
   console.log(
-    `File received: ${file.originalname}, Size: ${file.size} bytes, MIME: ${file.mimetype}`
+    `File received: ${file.originalname}, Size: ${file.size} bytes, MIME: ${file.mimetype}`,
   );
 
   try {
@@ -92,12 +92,17 @@ app.post("/api/analyze", upload.single("file"), (req, res) => {
     if (
       fileExtension === ".zip" ||
       mimeType === "application/zip" ||
-      mimeType === "application/x-zip-compressed"
+      mimeType === "application/x-zip-compressed" ||
+      (mimeType === "application/octet-stream" && fileExtension === ".zip") // Handle generic zip
     ) {
       console.log("Processing ZIP file...");
       textContent = extractTextFromZip(file.buffer);
-    } else if (fileExtension === ".txt" || mimeType === "text/plain") {
-      console.log("Processing TXT file...");
+    } else if (
+      fileExtension === ".txt" ||
+      mimeType === "text/plain" ||
+      mimeType === "application/octet-stream" // Allow generic binary (common on mobile for text)
+    ) {
+      console.log("Processing TXT file (with mobile fallback)...");
       textContent = file.buffer.toString("utf8");
     } else {
       return res.status(400).json({
@@ -156,13 +161,13 @@ function extractTextFromZip(zipBuffer) {
             const text = fileContent.toString("utf8");
             extractedText += text + "\n\n";
             console.log(
-              `Successfully extracted ${entry.entryName}, content length: ${text.length}`
+              `Successfully extracted ${entry.entryName}, content length: ${text.length}`,
             );
           }
         } catch (readError) {
           console.warn(
             `Could not read file ${entry.entryName}:`,
-            readError.message
+            readError.message,
           );
         }
       }
@@ -321,18 +326,18 @@ function analyzeChat(text) {
 
   if (!messages || messages.length === 0) {
     throw new Error(
-      "No messages could be parsed from the file. Please check the WhatsApp export format."
+      "No messages could be parsed from the file. Please check the WhatsApp export format.",
     );
   }
 
   // Filter out messages with invalid timestamps
   const validMessages = messages.filter(
-    (msg) => msg.timestamp && !isNaN(msg.timestamp.getTime())
+    (msg) => msg.timestamp && !isNaN(msg.timestamp.getTime()),
   );
 
   if (validMessages.length === 0) {
     throw new Error(
-      "No valid messages with proper timestamps found. Please check the WhatsApp export format."
+      "No valid messages with proper timestamps found. Please check the WhatsApp export format.",
     );
   }
 
@@ -346,8 +351,8 @@ function analyzeChat(text) {
       console.log(
         `${i + 1}. ${m.timestamp.toLocaleString()} - ${
           m.sender
-        }: ${m.text.slice(0, 40)}`
-      )
+        }: ${m.text.slice(0, 40)}`,
+      ),
     );
 
   // Enhanced participant analysis
@@ -380,7 +385,7 @@ function analyzeChat(text) {
   });
 
   const participants = Object.keys(counts).sort(
-    (a, b) => counts[b] - counts[a]
+    (a, b) => counts[b] - counts[a],
   );
 
   console.log(`Participants found: ${participants.join(", ")}`);
@@ -389,7 +394,7 @@ function analyzeChat(text) {
     throw new Error(
       `Need at least two participants in the chat. Found: ${
         participants.length
-      } participant(s) - ${participants.join(", ")}`
+      } participant(s) - ${participants.join(", ")}`,
     );
   }
 
@@ -399,7 +404,7 @@ function analyzeChat(text) {
   const countB = counts[B];
 
   console.log(
-    `Primary participants: ${A} (${countA} messages) and ${B} (${countB} messages)`
+    `Primary participants: ${A} (${countA} messages) and ${B} (${countB} messages)`,
   );
 
   // Enhanced Reply Analysis
@@ -788,7 +793,7 @@ function analyzeChat(text) {
   const maxPossible = 125;
   const loveScore = Math.max(
     0,
-    Math.min(100, Math.round((rawLove / maxPossible) * 100))
+    Math.min(100, Math.round((rawLove / maxPossible) * 100)),
   );
 
   // ========== ENHANCED INSIGHTS DATA ==========
@@ -926,7 +931,7 @@ function analyzeChat(text) {
   console.log(`First message: ${firstMessage.timestamp.toLocaleDateString()}`);
   console.log(`Last message: ${lastMessage.timestamp.toLocaleDateString()}`);
   console.log(
-    `Positive words: ${positiveCount}, Negative words: ${negativeCount}`
+    `Positive words: ${positiveCount}, Negative words: ${negativeCount}`,
   );
 
   return {
